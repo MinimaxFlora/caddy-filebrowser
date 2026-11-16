@@ -6,7 +6,7 @@ require (
 	github.com/caddyserver/caddy/v2 v2.11.9
 	github.com/dustin/go-humanize v1.1.0
 	github.com/microcosm-cc/bluemonday v1.0.27
-	github.com/yuin/goldmark v1.8.6
+	github.com/yuin/goldmark v1.8.7
 	go.uber.org/zap v1.28.0
 )
 
