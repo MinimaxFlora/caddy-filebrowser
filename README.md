@@ -1,112 +1,85 @@
-# caddy-filebrowser
+# caddy-github-browse
 
-A Caddy v2 file-server module with a GitHub-style README and an in-page file preview dialog.
+A single-file [Caddy](https://caddyserver.com/) `file_server` browse template with:
 
-Instead of a directory listing that navigates straight to every file, `filebrowser`
-renders the current directory's README and opens text, code, Markdown, images, PDF,
-audio and video in a focused preview dialog. Normal links still work with JavaScript
-disabled.
+- GitHub-style README rendered below the directory listing
+- Click-to-open preview dialog instead of navigating to the raw file
+- Syntax highlighting for source files and README code blocks
+- Markdown rendered/source switch in the dialog
+- Images, SVG, PDF, audio and video previews
+- The stock Caddy list/grid view, search, sorting, breadcrumbs and file counts
+- Light and dark themes from the browser color scheme
+- No plugin, no custom server, no build step at runtime
 
-![Directory listing with rendered README](docs/listing.png)
+It runs on **Caddy's built-in `file_server`**. Only one HTML template is configured
+through the native `browse` subdirective.
 
-![File preview dialog](docs/preview.png)
+> v0.1.0 was an experimental standalone handler. v0.2.0 and later use the stock
+> `file_server`; do not install the old module. There is no second server process.
 
-## Features
+![Caddy stock file list with README below it](docs/listing.png)
 
-- Rendered `README.md` / `README.markdown` / `README` card above the listing
-- File preview dialog with Rendered / Source tabs for Markdown
-- Text and code preview with a server-enforced size limit
-- Image, PDF, audio and video previews
-- Direct file URLs still work for sharing and downloads
-- Breadcrumbs, parent navigation, file type icons, sizes and timestamps
-- Client-side file filter
-- Light and dark themes, responsive layout
-- Hidden-file patterns, symlink-escape protection and Markdown HTML sanitization
-- No external JS/CSS/CDN dependencies; everything is embedded in the Caddy binary
-- Single-purpose Caddy module: no database, no uploads, no runtime configuration files
+![Preview dialog with syntax highlighting](docs/preview.png)
+
+## Live demo
+
+http://103.116.247.139:8080/
+
+The demo is served by Caddy's stock `file_server` on port 8080. There is no
+secondary file server or plugin process.
 
 ## Install
 
-Build Caddy with xcaddy:
-
-```bash
-xcaddy build --with github.com/MinimaxFlora/caddy-filebrowser
-```
-
-To pin a version:
-
-```bash
-xcaddy build v2.11.9 \
-  --with github.com/MinimaxFlora/caddy-filebrowser@v0.1.0
-```
-
-## Caddyfile
-
-Replace `file_server` with `filebrowser`:
+1. Copy `browse.html` somewhere Caddy can read, for example `/etc/caddy/browse.html`.
+2. Point `file_server` at it:
 
 ```caddyfile
-http:// {
+:8080 {
     root * /usr/share/caddy
-    filebrowser
-    encode gzip
-}
-```
-
-The root defaults to the site root set by the `root` directive, so the common
-Caddy file-server configuration only needs the handler name changed.
-
-With options:
-
-```caddyfile
-files.example.com {
-    root * /srv/files
-    filebrowser {
-        preview_max_size 2MiB
-        browse_limit 5000
-        hide .git .env node_modules
-        readme README.md README.markdown README
+    file_server {
+        browse /etc/caddy/browse.html
+        hide .git .env
     }
     encode gzip
 }
 ```
 
-If you keep `file_server` in the same route, `filebrowser` runs first because it is
-ordered before `file_server`; files handled by `filebrowser` never reach the default
-file server. Removing `file_server` is recommended to avoid two file-serving
-handlers with different settings.
+Reload Caddy:
 
-## Options
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+sudo systemctl reload caddy
+```
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `root` | `{http.vars.root}` | Directory to serve. Supports Caddy placeholders. |
-| `hide` | `.git .env .DS_Store Thumbs.db node_modules __pycache__` | Names or `path.Match` patterns hidden from the listing and blocked from direct access. `hide` with no arguments disables hiding. |
-| `readme` | `README.md README.markdown README readme.md` | File names checked in order for the README card. Matching is case-insensitive. |
-| `preview_max_size` | `1MiB` | Maximum bytes read for README and text previews. Larger files can still be downloaded. Maximum 64 MiB. |
-| `browse_limit` | `10000` | Maximum entries rendered in one directory. Maximum 100000. |
+No xcaddy rebuild and no module installation are required. `file_server` remains
+the handler that serves every file; the template only changes the directory page
+and adds the browser-side preview.
 
-## Behavior
+## How it works
 
-- A directory URL without a trailing slash redirects to the slash form.
-- Links in the listing are relative, so the module also works behind `handle_path`.
-- Text/JSON preview is served from the same file URL with `?__fb=preview`; this is an
-  internal endpoint used by the dialog and returns JSON.
-- `?download=1` forces `Content-Disposition: attachment`.
-- HTML, XHTML, SVG and XML files are served as attachments by default to avoid
-  executing untrusted markup on the serving origin. They can still be previewed as
-  text inside the dialog.
-- Markdown is rendered with Goldmark (GFM) and sanitized with Bluemonday's UGC
-  policy. Raw HTML in a README is not rendered.
-- Files reached through symlinks are only served when the resolved target remains
-  inside the configured root.
-- With JavaScript disabled, the README is still rendered and file links open
-  directly. The preview dialog requires JavaScript.
+- Caddy's stock `file_server` renders the directory listing and serves raw files.
+- The template adds a small amount of CSS/JS and two vendored browser libraries:
+  - [marked](https://github.com/markedjs/marked) for Markdown
+  - [highlight.js](https://highlightjs.org/) for syntax highlighting
+  - [DOMPurify](https://github.com/cure53/DOMPurify) for sanitizing rendered Markdown
+- On a directory page, the browser fetches `README.md`, `README.markdown`, `README`
+  or `readme.md` (first match, up to 1 MiB) and renders it under the listing.
+- Clicking a file fetches up to 1 MiB of text and opens the dialog. Images, PDF,
+  audio and video are loaded directly from their normal URL.
+- Ctrl/Cmd/Shift-click, middle-click and non-JavaScript users still get the normal
+  raw file link from `file_server`.
+- The template extends Caddy's stock Content-Security-Policy with
+  `connect-src 'self'`, `media-src 'self'` and `frame-src 'self'` so previews work
+  without allowing third-party scripts.
 
-## Security notes
+## Security
 
-This module is a read-only file browser. It does not provide authentication,
-upload, edit or delete functions. If the directory is not meant to be public, put
-Caddy authentication in front of it:
+- This is a read-only browse template. Upload, edit and delete are not included.
+- Markdown from a README is sanitized with DOMPurify before insertion.
+- Raw HTML in README files is not trusted.
+- External images are blocked by the Content-Security-Policy; relative images work.
+- `file_server` still serves the original files; use Caddy authentication and
+  filesystem permissions for private content:
 
 ```caddyfile
 files.example.com {
@@ -114,38 +87,59 @@ files.example.com {
         alice $2a$14$...hash...
     }
     root * /srv/files
-    filebrowser
+    file_server {
+        browse /etc/caddy/browse.html
+    }
 }
 ```
 
-The directory being served must contain only content you are willing to publish.
-The default hidden list is a convenience, not a security boundary; use filesystem
-permissions and authentication for sensitive data.
+## Options
 
-## Why not an existing plugin?
+The template has no Caddy configuration options of its own. Use the stock
+`file_server` options:
 
-At the time of writing:
+| Option | Meaning |
+| --- | --- |
+| `browse <file>` | Use this template for directory pages. |
+| `hide <names...>` | Hide files/directories from the listing (for example `.git`). |
+| `index <names...>` | Serve an index file instead of the browse page when present. |
 
-- `filebrowser/caddy` is a Caddy v1 plugin and is archived.
-- `glowinthedark/caddy-file-server-browse-extension` is a custom `browse.html`
-  template, not a Caddy module; it does not add a README card.
-- `synapticloop/caddy_media_gallery` is a Caddy v2 module, but it only provides a
-  media lightbox, not README rendering or text/code preview.
+The README candidates are fixed in `template/custom.js`; edit the `names` array and
+rebuild if you need different names.
 
-`caddy-filebrowser` combines those ideas in a focused Caddy v2 module.
+## Build / development
 
-## Development
+The committed `browse.html` is generated from:
+
+- `template/browse.base.html` — Caddy's stock browse template (Apache-2.0)
+- `template/custom.css` — README and dialog styles
+- `template/custom.js` — README/modal logic
+- `assets/highlight.min.js`, `assets/marked.min.js`, `assets/purify.min.js`
+
+Rebuild after editing the sources:
 
 ```bash
-go test ./...
-go vet ./...
-xcaddy build v2.11.9 --with github.com/MinimaxFlora/caddy-filebrowser=.
-./caddy run --config testdata/Caddyfile --adapter caddyfile
-# open http://127.0.0.1:18080/
+python3 -I build-template.py
 ```
 
-`testdata/` contains a small demo tree and a Caddyfile for local testing.
+Then serve the demo locally:
+
+```bash
+caddy run --config testdata/Caddyfile --adapter caddyfile
+# http://127.0.0.1:18080/
+```
+
+`testdata/Caddyfile` uses the stock `file_server` with
+`browse ./browse.html`.
+
+## Relationship to existing projects
+
+Caddy v1's `filebrowser` plugin is archived and is not used here. The
+`glowinthedark/caddy-file-server-browse-extension` project is a customized browse
+template with a similar idea; this template is based on Caddy's current stock
+`browse.html` and adds a README card, a preview dialog and CSP-safe Markdown.
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The base template is derived from Caddy's stock `browse.html` (Apache-2.0).

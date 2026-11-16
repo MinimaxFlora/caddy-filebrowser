@@ -5,8 +5,9 @@
 
 http://127.0.0.1:18080 {
 	root * ./testdata
-	encode gzip
-	filebrowser {
-		preview_max_size 2MiB
+	file_server {
+		browse ./browse.html
+		hide .git .env
 	}
+	encode gzip
 }

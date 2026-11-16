@@ -9,32 +9,34 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-python@v5
         with:
-          go-version-file: go.mod
-          cache: true
+          python-version: "3.12"
 
-      - name: Format
-        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: Rebuild browse.html
+        run: python3 -I build-template.py
 
-      - name: Vet
-        run: go vet ./...
+      - name: Generated file is up to date
+        run: git diff --exit-code -- browse.html
 
-      - name: Test
-        run: go test -race ./...
-
-      - name: Install xcaddy
-        run: go install github.com/caddyserver/xcaddy/cmd/xcaddy@v0.4.7
-
-      - name: Build with Caddy
-        run: xcaddy build v2.11.9 --with github.com/MinimaxFlora/caddy-filebrowser=.
-
-      - name: Verify module and Caddyfile
+      - name: Template markers
         run: |
-          ./caddy list-modules | grep -qx 'http.handlers.filebrowser'
-          ./caddy validate --config testdata/Caddyfile --adapter caddyfile
+          grep -q 'fb-readme' browse.html
+          grep -q 'data-fb-close' browse.html
+          grep -q "connect-src 'self'" browse.html
+          grep -q 'highlight.min.js' build-template.py
+          test -s assets/highlight.min.js
+          test -s assets/marked.min.js
+          test -s assets/purify.min.js
+
+      - name: Validate stock file_server config
+        run: |
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            caddy:2.11.9 \
+            validate --config testdata/Caddyfile --adapter caddyfile
