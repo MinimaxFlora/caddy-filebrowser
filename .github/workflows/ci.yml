@@ -39,4 +39,4 @@ jobs:
           docker run --rm \
             -v "$PWD:/work" -w /work \
             caddy:2.11.9 \
-            validate --config testdata/Caddyfile --adapter caddyfile
+            caddy validate --config testdata/Caddyfile --adapter caddyfile
