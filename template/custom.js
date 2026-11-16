@@ -389,7 +389,10 @@
           }
           section.appendChild(head);
           section.appendChild(article);
-          listing.after(section);
+          var gap = document.createElement("div");
+          gap.className = "fb-readme-gap";
+          listing.after(gap);
+          gap.after(section);
           detectLicense(licenseTab);
         })
         .catch(function () { next(); });

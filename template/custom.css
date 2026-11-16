@@ -51,13 +51,14 @@
 }
 
 #fb-readme {
-  margin: 28px 0 40px;
+  margin: 0 0 40px;
   border: 1px solid var(--fb-line);
   border-radius: 12px;
   background: var(--fb-surface);
   overflow: hidden;
 }
 #fb-readme[hidden] { display: none; }
+.fb-readme-gap { height: 28px; }
 .fb-readme-head {
   display: flex;
   align-items: stretch;
